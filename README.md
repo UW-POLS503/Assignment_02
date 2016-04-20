@@ -5,6 +5,19 @@ $$
 \declareMathOperator{\quantile}{quantile}
 $$
 
+## Instructions
+
+1. [Fork this repository](https://help.github.com/articles/using-pull-requests/) to your GitHub account.
+2. Write your solutions in R Markdown in a file named `solutions.Rmd`.
+3. When you are ready to submit your assignment, [initiate a pull request](https://help.github.com/articles/using-pull-requests/#initiating-the-pull-request). Title your
+pull request "Submission".
+
+To update your fork from the upstream repository:
+
+1. On your fork, e.g. `https://github.com/jrnold/Assignment_02` click on "New Pull reqest"
+2. Set your fork `jrnold/Assignment_02` as the base fork on the left, and `UW-POLS503/Assignment_02` as the head fork on the right. In both cases the branch will be master. This means, compare any chanes in the head fork that are not in the base fork. You will see differences between the `US-POLS503` repo and your fork. Click on "Create Pull Request", and if there are no issues, "Click Merge" A quick way is to use this link, but change the `jrnold` to your own username: `https://github.com/jrnold/Assignment_02/compare/master...UW-POLS503:master`.
+
+
 # Libraries used 
 
 
@@ -141,19 +154,19 @@ run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
 ```
 ## Source: local data frame [3,072 x 6]
 ## 
-##           term    estimate  std.error  statistic      p.value .iter
-##          (chr)       (dbl)      (dbl)      (dbl)        (dbl) (int)
-## 1  (Intercept) -0.02049312 0.03126445 -0.6554769 5.331030e-01     1
-## 2           x1  0.95325460 0.02069438 46.0634509 5.940591e-10     1
-## 3           x2  0.97919229 0.05011569 19.5386382 2.295939e-07     1
-## 4  (Intercept) -0.10556293 0.03762724 -2.8054919 2.631577e-02     2
-## 5           x1  1.04598418 0.02490600 41.9972687 1.132077e-09     2
-## 6           x2  0.84302655 0.06031500 13.9770632 2.271331e-06     2
-## 7  (Intercept) -0.03501616 0.03931273 -0.8907079 4.026606e-01     3
-## 8           x1  1.02500755 0.02602165 39.3905657 1.769895e-09     3
-## 9           x2  0.98173058 0.06301676 15.5788796 1.085407e-06     3
-## 10 (Intercept)  0.01158691 0.03468550  0.3340565 7.481218e-01     4
-## ..         ...         ...        ...        ...          ...   ...
+##           term     estimate  std.error  statistic      p.value .iter
+##          (chr)        (dbl)      (dbl)      (dbl)        (dbl) (int)
+## 1  (Intercept)  0.006938235 0.02842171  0.2441174 8.141405e-01     1
+## 2           x1  1.073141921 0.03702731 28.9824433 1.498360e-08     1
+## 3           x2  0.973307620 0.02596218 37.4894459 2.498613e-09     1
+## 4  (Intercept)  0.071984100 0.02366764  3.0414561 1.880827e-02     2
+## 5           x1  1.008222063 0.03083379 32.6986091 6.475192e-09     2
+## 6           x2  1.014961673 0.02161951 46.9465615 5.203122e-10     2
+## 7  (Intercept)  0.046974585 0.02818009  1.6669425 1.394638e-01     3
+## 8           x1  0.986890795 0.03671252 26.8815860 2.526762e-08     3
+## 9           x2  0.963216885 0.02574146 37.4188934 2.531630e-09     3
+## 10 (Intercept) -0.011081617 0.01329075 -0.8337839 4.319307e-01     4
+## ..         ...          ...        ...        ...          ...   ...
 ```
 
 Suppose that we want to run this for several different sample sizes

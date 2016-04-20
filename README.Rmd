@@ -10,6 +10,19 @@ $$
 \declareMathOperator{\quantile}{quantile}
 $$
 
+## Instructions
+
+1. [Fork this repository](https://help.github.com/articles/using-pull-requests/) to your GitHub account.
+2. Write your solutions in R Markdown in a file named `solutions.Rmd`.
+3. When you are ready to submit your assignment, [initiate a pull request](https://help.github.com/articles/using-pull-requests/#initiating-the-pull-request). Title your
+pull request "Submission".
+
+To update your fork from the upstream repository:
+
+1. On your fork, e.g. `https://github.com/jrnold/Assignment_02` click on "New Pull reqest"
+2. Set your fork `jrnold/Assignment_02` as the base fork on the left, and `UW-POLS503/Assignment_02` as the head fork on the right. In both cases the branch will be master. This means, compare any chanes in the head fork that are not in the base fork. You will see differences between the `US-POLS503` repo and your fork. Click on "Create Pull Request", and if there are no issues, "Click Merge" A quick way is to use this link, but change the `jrnold` to your own username: `https://github.com/jrnold/Assignment_02/compare/master...UW-POLS503:master`.
+
+
 # Libraries used 
 
 ```{r message=FALSE}
