@@ -71,10 +71,11 @@ In this case, the regression run on the samples has the correct specification, b
 ```{r}
 sim_linear_normal <- function(.data, beta, sigma) {
   # X gives the number of observations in the data
-  n <- nrow(X)
+  n <- nrow(.data)
   # Draw data
   # This creates the X matrix
   X <- model.matrix(~., .data)
+  print(X)
   # Create E(y | X)
   yhat <- X %*% beta
   # errors drawn from a normal distribution
@@ -89,6 +90,7 @@ sim_linear_normal <- function(.data, beta, sigma) {
 }
 ```
 
+This function runs a function multiple times:
 ```{r}
 run_iterations <- function(.iter, FUN, ...) {
   results <- vector(mode = "list", length = .iter)
@@ -105,7 +107,7 @@ run_iterations <- function(.iter, FUN, ...) {
 
 
 ```{r}
-summarize_params <- function(.data, beta) {
+summarize_params <- function(.data) {
   ret <- .data %>%
     group_by(term) %>%
     summarize(estimate_mean = mean(estimate),
@@ -114,14 +116,17 @@ summarize_params <- function(.data, beta) {
               estimate_se = sd(estimate) / sqrt(length(estimate)),
               std_error_se = sd(std.error) / sqrt(length(estimate)),
               iter = length(estimate))
-  ret[["beta_true"]] <- beta
   ret
 }
 ```
 
-Now draw many samples of sample size 10,
+Number of observations in the sample:
 ```{r}
 n <- 10
+```
+For data, we need the number of variables,
+the mean of the variables, standard deviation of the variables, and their correlation,
+```{r}
 k <- 2
 mu_X <- rep(0, k)
 s_X <- rep(1, k)
@@ -131,9 +136,14 @@ X <- as.data.frame(rmvnorm(n, mu_X, sdcor2cov(s_X, R_X)))
 names(X) <- paste("x", seq_len(k), sep = "")
 sigma <- 0.1
 ```
+Run one iteration
+```{r}
+sim_linear_normal(X, beta, sigma)
+```
+
 Run 1024 iterations
 ```{r}
-run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
+sim1 <- run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
 ```
 
 Suppose that we want to run this for several different sample sizes
