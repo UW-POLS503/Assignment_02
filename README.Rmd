@@ -5,9 +5,9 @@ output:
     keep_md: true
 ---
 $$
-\declareMathOperator{\cor}{cor}
-\declareMathOperator{\cov}{cov}
-\declareMathOperator{\quantile}{quantile}
+\DeclareMathOperator{\cor}{cor}
+\DeclareMathOperator{\cov}{cov}
+\DeclareMathOperator{\quantile}{quantile}
 $$
 
 ## Instructions
@@ -74,20 +74,104 @@ $$
 For a sample $y$ from that population, the OLS regression which will be run is
 $$
 \begin{aligned}[t]
-y_i &= \hat\beta_0 + \sum_{j = 1}^k \hat\beta_j x_{i,j} + \hat\epsilon_i \\
-\hat\sigma^2 &= \frac{\sum \hat\epsilon_i }{n - k - 1}
+y_i &= \hat\beta_0 + \sum_{j = 1}^k \hat\beta_j x_{i,j} + \hat\varepsilon_i
 \end{aligned}
 $$
+and the estimate of the population variance is
+$$
+\widehat\sigma^2 &= \frac{\sum \hat\varepsilon_i }{n - k - 1} .
+$$
 In this case, the regression run on the samples has the correct specification, but that will not necessarily be true for other exercises.
+
+Let's review the steps that we need to take for this problem.
+
+1. Draw data from the population
+2. Estimate the OLS parameters on that data
+3. Return data 
+4. Repeat 1-3 many times
+
+Of these steps, the meat of the problem is in steps 1--3. Once we have that done, we can 
+repeat it many times with a `for` loop.
+
+The specified population here is
+$$
+Y_i &= \beta_0 + \sum_{j = 1}^k \beta_j x_{i,j} + \varepsilon_i \\
+\varepsilon_i & \sim N(0, \sigma^2)
+$$
+What is known (or we need to specify) are the regression parameters, $\beta_0, \dots, \beta_j$,
+the population variance, $\sigma^2$, and the predictors, $\mat{X}$.
+
+Let's choose to simulate from the population,
+$$
+Y_i &= 0 + 1 x_{i,j} + \varepsilon_i
+$$
+This means that $\vec{\beta} = (0, 1)'$
+```{r}
+beta <- c(0, 1)
+```
+We also need to choose a sample size, $n$, and the values of $\mat{X}$.
+While OLS in no way requires $\mat{X}$ to be distributed normal, for these simulations it 
+will be convenient to simulate $\mat{X}$ from a normal distribution, since we can easily choose
+the mean and variance of the sample.
+Let's specify that that the sample size is $n = 30$, and the mean and standard deviations are $\bar{\vec{x}} = 0$ and $\bar{\vec{x}} = 1$.
+```{r}
+n <- 30
+x_mean <- 0
+x_sd <- 1
+```
+Now let's draw a sample of size `r n` from a standard normal distribution, $N(0, 1)$, using the function `rnorm`,
+```{r}
+x_raw <- rnorm(n, mean = 0, sd = 1)
+```
+Note that even though the sample was drawn from a normal distribution with the mean and standard deviation 
+that we wanted, due to sampling variation, the sample mean and standard deviation will not be exactly 0 and 1, respectively.
+```{r}
+mean(x_raw)
+sd(x_raw)
+```
+So, substract the sample mean and divide by the sample standard deviation to get a sample with a mean of 0 and standard deviation of 1,
+$$
+x <- (x_raw - mean(x_raw)) / sd(x_raw)
+mean(x)
+sd(x)
+$$
+Note, the R function `scale` will also do this.
+
+We still need to choose a $\sigma^2$.
+```{r}
+sigma <- 0.01
+```
+
+
+```{r sim_lin_normal_body,eval=FALSE,echo=FALSE}
+  # X gives the number of observations in the data
+  n <- nrow(.data)
+  # Draw data
+  # This creates the X matrix
+  X <- model.matrix(~., .data)
+  print(X)
+  # Create E(y | X)
+  yhat <- X %*% beta
+  # errors drawn from a normal distribution
+  epsilon <- rnorm(n, mean = 0, sd = sigma)
+  # actual y's
+  y <- yhat + epsilon
+  .data$y <- y
+  # Estimate model
+  mod <- lm(y ~ ., data = .data)
+  # Return results
+  tidy(mod)
+```
 
 
 ```{r}
 sim_linear_normal <- function(.data, beta, sigma) {
   # X gives the number of observations in the data
-  n <- nrow(X)
+  n <- nrow(.data)
   # Draw data
   # This creates the X matrix
   X <- model.matrix(~., .data)
+  print(X)
   # Create E(y | X)
   yhat <- X %*% beta
   # errors drawn from a normal distribution
@@ -102,6 +186,7 @@ sim_linear_normal <- function(.data, beta, sigma) {
 }
 ```
 
+This function runs a function multiple times:
 ```{r}
 run_iterations <- function(.iter, FUN, ...) {
   results <- vector(mode = "list", length = .iter)
@@ -118,7 +203,7 @@ run_iterations <- function(.iter, FUN, ...) {
 
 
 ```{r}
-summarize_params <- function(.data, beta) {
+summarize_params <- function(.data) {
   ret <- .data %>%
     group_by(term) %>%
     summarize(estimate_mean = mean(estimate),
@@ -127,14 +212,17 @@ summarize_params <- function(.data, beta) {
               estimate_se = sd(estimate) / sqrt(length(estimate)),
               std_error_se = sd(std.error) / sqrt(length(estimate)),
               iter = length(estimate))
-  ret[["beta_true"]] <- beta
   ret
 }
 ```
 
-Now draw many samples of sample size 10,
+Number of observations in the sample:
 ```{r}
 n <- 10
+```
+For data, we need the number of variables,
+the mean of the variables, standard deviation of the variables, and their correlation,
+```{r}
 k <- 2
 mu_X <- rep(0, k)
 s_X <- rep(1, k)
@@ -144,9 +232,14 @@ X <- as.data.frame(rmvnorm(n, mu_X, sdcor2cov(s_X, R_X)))
 names(X) <- paste("x", seq_len(k), sep = "")
 sigma <- 0.1
 ```
+Run one iteration
+```{r}
+sim_linear_normal(X, beta, sigma)
+```
+
 Run 1024 iterations
 ```{r}
-run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
+sim1 <- run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
 ```
 
 Suppose that we want to run this for several different sample sizes
@@ -330,7 +423,6 @@ In particular, if we gather more data but $y$ is truncated, does it decrease the
     as long as certain conditions are met. See Fox (2nd ed.), Ch 9.6.
 
 [^samplingdv]: See Ashworth, Scott, Joshua D. Clinton, Adam Meirowitz, and Kristopher W. Ramsay. 2008. ``Design, Inference, and the Strategic Logic of Suicide Terrorism.'' *American Political Science Review() 102(02): 269–73. <http://journals.cambridge.org/article_S0003055408080167>
-
 
 ```{r}
 sim_truncated <- function(iter, .data, beta, sigma, q) {
