@@ -138,6 +138,8 @@ $$
 Note, the R function `scale` will also do this.
 
 We still need to choose a $\sigma^2$.
+This is somewhat arbitrary, but I'll chose a $\sigma$ that gives an $R^2 = 0.7$.
+The function `
 ```{r}
 sigma <- 0.01
 ```
