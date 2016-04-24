@@ -4,13 +4,6 @@ output:
   html_document:
     keep_md: true
 ---
-$$
-\DeclareMathOperator{\cor}{cor}
-\DeclareMathOperator{\cov}{cov}
-\DeclareMathOperator{\quantile}{quantile}
-$$
-
-## Instructions
 
 1. [Fork this repository](https://help.github.com/articles/using-pull-requests/) to your GitHub account.
 2. Write your solutions in R Markdown in a file named `solutions.Rmd`.
@@ -101,7 +94,7 @@ $$
 What is known (or we need to specify) are the regression parameters, $\beta_0, \dots, \beta_j$,
 the population variance, $\sigma^2$, and the predictors, $\mat{X}$.
 
-Let's choose to simulate from the population,
+Let's choose to simulate from the population:
 $$
 Y_i &= 0 + 1 x_{i,j} + \varepsilon_i
 $$
@@ -130,78 +123,143 @@ mean(x_raw)
 sd(x_raw)
 ```
 So, substract the sample mean and divide by the sample standard deviation to get a sample with a mean of 0 and standard deviation of 1,
-$$
+
+```{r}
 x <- (x_raw - mean(x_raw)) / sd(x_raw)
 mean(x)
 sd(x)
+```
+The R function [scale](http://www.rdocumentation.org/packages/base/functions/scale) will also do this.
+
+Now, create a data frame with the predictors,
+```{r}
+dataset <- data.frame(X1 = x)
+```
+For the computations, we will need to use the design matrix of the predictors.
+The R function `model.matrix` converts a formula to a design matrix.
+```{r}
+X <- model.matrix(~ X1, data = dataset)
+head(X)
+```
+Note, that unlike `dataset`, `X` has a column of 1's for the intercept.
+The function `model.matrix` also converts categorical variables into dummy variables, expand interactions, and evaluates functions in the formula.
+
+To calculate the outcome variable, we still need to choose a variance from which the errors are drawn, since $\epsilon_i \sim N(0, \sigma^2)$.
+I'll choose a value of $\sigma$ that will give the regression an $R^2$ of 0.5.
+The function `pols503::r2_to_sigma` can calculate this.
+```{r}
+sigma <- r2_to_sigma(X, beta, 0.5)
+sigma
+```
+
+Now, we need to calculate the outcome variable, $y$,
 $$
-Note, the R function `scale` will also do this.
-
-We still need to choose a $\sigma^2$.
+\vec{y} = \mat{X} \vec{\beta} + \vec{\varepsilon} = \vec{\hat{y}} + \vec{\varepsilon} .
+$$
+First, calculate $\hat{\vec{y}}$:
 ```{r}
-sigma <- 0.01
+y_hat <- X %*% beta
+```
+Next, sample $\varepsilon_i \sim \dnorm(0, \sigma^2)$:
+```{r}
+eps <- rnorm(n, mean = 0, sd = sigma)
+```
+Finally, calculate $\vec{y}$ from the sum of the expected values and errors,
+```{r}
+y <- y_hat + eps
+```
+Append this to the dataset we are using,
+```{r}
+dataset[["y"]] <- y
 ```
 
-
-```{r sim_lin_normal_body,eval=FALSE,echo=FALSE}
-  # X gives the number of observations in the data
-  n <- nrow(.data)
-  # Draw data
-  # This creates the X matrix
-  X <- model.matrix(~., .data)
-  print(X)
-  # Create E(y | X)
-  yhat <- X %*% beta
-  # errors drawn from a normal distribution
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  .data$y <- y
-  # Estimate model
-  mod <- lm(y ~ ., data = .data)
-  # Return results
-  tidy(mod)
+Now that we have drawn a sample $\vec{y}$ from the population, we want to estimate $\beta$ using OLS,
+```{r}
+mod <- lm(y ~ X1, data = dataset)
+mod
+```
+For ease of analysis later, we convert the coefficient results to a data frame using the **broom** function [tidy](http://www.rdocumentation.org/packages/broom/functions/tidy).
+```{r}
+tidy(mod)
 ```
 
+The problem is that we want to do this multiple times.
+Within a simulation, we will need to run multiple iterations.
+And in different iterations, we will draw simulations with different samples.
 
+First, create a function to sample $n$ observations of $X$ from a multivariate normal distribution for given means, standard deviations, and
+correlation between the variables.
 ```{r}
-sim_linear_normal <- function(.data, beta, sigma) {
-  # X gives the number of observations in the data
-  n <- nrow(.data)
-  # Draw data
-  # This creates the X matrix
-  X <- model.matrix(~., .data)
-  print(X)
-  # Create E(y | X)
-  yhat <- X %*% beta
-  # errors drawn from a normal distribution
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  .data$y <- y
-  # Estimate model
-  mod <- lm(y ~ ., data = .data)
-  # Return results
-  tidy(mod)
+normal_X <- function(n, mean, sd, cor) {
+  X <- as.data.frame(MASS::mvrnorm(n, mu = 0, Sigma = sdcor2cov(sd, cor)))
+  names(X) <- paste0("x", seq_len(ncol(X)))
+  X                     
 }
 ```
 
-This function runs a function multiple times:
+Second, create a function to sample from the population.
 ```{r}
-run_iterations <- function(.iter, FUN, ...) {
-  results <- vector(mode = "list", length = .iter)
-  p <- progress_estimated(.iter, min_time = 2)
-  for (i in seq_len(.iter)) {
-    .data <- FUN(...)
-    .data[[".iter"]] <- i
+sample_linear_normal <- function(Xdata, beta, sigma) {
+  X <- model.matrix(~ ., data = Xdata)
+  y_hat <- X %*% beta
+  eps <- rnorm(n, mean = 0, sd = sigma)
+  y <- y_hat + eps
+  Xdata[["y"]] <- y
+  Xdata
+}
+```
+
+Now we will repeat this process multiple times.
+First, create an empty `list` object to store the data frames returned
+by `sim_linear_normal` in each iteration.
+```{r}
+results <- list()
+```
+Because this may take some time, let's create a progress bar using the
+function [progress_estimated](http://www.rdocumentation.org/packages/dplyr/functions/progress_estimated) from the **dplyr** package.
+```{r}
+p <- progress_estimated(iter, min_time = 2)
+```
+Now run `sim_linear_normal()` `r iter` times with a `for` loop.[^for]
+In each iteraction, we also add a variable to the results indicating the iteration, and update the progress bar.
+```{r}
+for (i in seq_len(.iter)) {
+    .data <- sim_linear_normal(.data, beta, sigma) %>%
+      mutate(.iter = i)
     results[[i]] <- .data
     p$tick()$print()
   }
-  bind_rows(results)
-}
+```
+Now that the iterations are completed, `results` is a list in which each element is a data frame. But for analysis it will be easier to work with a single data frame.
+So, we stack the data frames on top of each other to create a single data frame,
+```{r}
+results <- bind_rows(results)
+head(results)
+```
+
+[^for]: One downside of using a `for` loop is that things are run sequentially, even though the results of one iteration do not depend on any other iteration. Taking advangage of modern hardware, we could make this faster by rewriting the for-loop above to run in parallel using [mclapply](http://www.rdocumentation.org/packages/parallel/functions/mclapply.html) from the built-in **parallel** package, or [foreach](http://www.rdocumentation.org/packages/foreach/functions/foreach) from the **foreach** package, among others.
+
+Now that we have the results in a data frame, to make sense of them, we need to summarize them.
+There are two estimators we are interested in: $\hat{\beta}$ and $\hat{\se}{\beta}$.
+So get the mean and standard deviation of the estimates, $\hat{\beta}$, and the standard errors, $\hat{\se}{\beta}$.
+```{r}
+results %>%
+  group_by(term) %>%
+  summarize(estimate_mean = mean(estimate),
+            estimate_sd = sd(estimate),
+            std_error_mean = mean(std.error),
+            std_error_sd = sd(std.error))
 ```
 
 
+Monte Carlo standard error is the error in simulations due to using only a finite number of samples. In other words, Monte Carlo is the sampling error in simulations.
+In order to ensure that we have enough simulations to get accurate estimates of the parameters of the sampling distribuitons of $\hat{\beta}$ and $\hat{\se}{\beta}$, we should include variables with the Monte Carlo error of the simulation estimates.
+The standard error of a mean is $\sigma / \sqrt{n}$, and the standard error of a standard deviation is approximately $\sigma / \sqrt{2 * (n - 1)}$.
+So 
+
+
+
+After these simulations we want to summarize the results of the coefficients.
 ```{r}
 summarize_params <- function(.data) {
   ret <- .data %>%
@@ -209,242 +267,13 @@ summarize_params <- function(.data) {
     summarize(estimate_mean = mean(estimate),
               estimate_sd = sd(estimate),
               std_error_mean = mean(std.error),
-              estimate_se = sd(estimate) / sqrt(length(estimate)),
-              std_error_se = sd(std.error) / sqrt(length(estimate)),
+              std_error_sd = sd(std.error),
+              estimate_mean_se = sd(estimate) / sqrt(n()),
+              estimate_sd_se = sd(estimate) / sqrt(2 * (n() - 1)),
+              std_error_mean_sd = sd(std.error) / sqrt(n()),
+              std_error_sd_se = sd(std.error) / sqrt(2 * (n() - 1)),
               iter = length(estimate))
   ret
 }
 ```
-
-Number of observations in the sample:
-```{r}
-n <- 10
-```
-For data, we need the number of variables,
-the mean of the variables, standard deviation of the variables, and their correlation,
-```{r}
-k <- 2
-mu_X <- rep(0, k)
-s_X <- rep(1, k)
-R_X <- diag(k)
-beta <- c(0, rep(1, k))
-X <- as.data.frame(rmvnorm(n, mu_X, sdcor2cov(s_X, R_X)))
-names(X) <- paste("x", seq_len(k), sep = "")
-sigma <- 0.1
-```
-Run one iteration
-```{r}
-sim_linear_normal(X, beta, sigma)
-```
-
-Run 1024 iterations
-```{r}
-sim1 <- run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
-```
-
-Suppose that we want to run this for several different sample sizes
-
-
-## Correlated Variables
-
-In the previous problem, the covariates were assumed to be independent.
-Now, we will evaluate the properties of OLS estimates when covariates are correlated.
-As before, the population is
-$$
-\begin{aligned}[t]
-Y_i &= 0 + 1 \cdot x_{1,i} + 1 \cdot x_{2,i} + 1 \cdot x_{3,i} + \epsilon_i \\
-\epsilon_i &\sim N(0, \sigma^2) \\
-\sigma &= 1.7
-\end{aligned}
-$$
-In this problem keep $\mu_X = (0, 0, 0)$ and $s_X = (1, 1, 1)$, but $R_X$ will differ between simulations to allow for different levels of correlation between $x_1$ and $x_2$.
-The covariate $x_3$ is independent of the other covariates, $\cor(x_1, x_3) = \cor(x_2, x_3) = 0$.
-Thus, the correlation matrix for $X$ in these simulations is the following, where $\rho_{1,2}$ will vary:
-$$
-R_X =
-\begin{bmatrix}
-1 & \rho_{1,2} & 0 \\
-\rho_{1,2} & 1 & 0 \\
-0 & 0 & 1 
-\end{bmatrix}
-$$
-
-Simulate using `sim_lin_normal` with the following levels of correlation between $x_1$ and $x_2$ ($\rho_{1,2}$): 0, 0.5, 0.95, -0.5, -0.95
-Based on the results of those simulations, how does $\cor(x_1, x_2)$ affect the following?
-
-- The bias of each $\hat{\beta}_j$?
-- The variance of each $\hat{\beta}_j$?
-- The bias of the standard error of each $\hat{\beta}_j$?
-- The bias of the robust standard error of each $\hat{\beta}_j$?
-
-Remember to consider the effects of correlation on *all* the estimates: $\hat{\beta}_1$, $\hat{\beta}_2$, and $\hat{\beta}_3$.
-
-What happens when $\rho = 1$ (or $\rho = -1$)? What assumption is violated?
-
-## Omitted Variable Bias
-
-The population is
-$$
-\begin{aligned}[t]
-Y_i &= 0 + 1 \cdot x_{1,i} + 1 \cdot x_{2,i} + 1 \cdot x_{3,i} + \epsilon_i \\
-\epsilon_i &\sim N(0, \sigma^2) \\
-\sigma &= 1.7
-\end{aligned}
-$$
-
-In all simulations, $(x_1, x_2)$ and $(x_2, x_3)$ are uncorrelated.
-The correlation between $x_1$ and $x_3$ will vary between simulations.
-In other words, the correlation matrix for the $x$ variables is
-$$
-R =
-\begin{bmatrix}
-1 & 0 & \rho_{1,3} \\
-0 & 1 & 0 \\
-\rho_{1,3} & 0 & 1 
-\end{bmatrix}
-$$
-
-In all simulations, the sample regression will only include $x_1$ and $x_2$:
-$$
-y_i = \hat\beta_0 + \hat\beta_1 x_{1,i} + \hat\beta_2 x_{2,i} + \hat\epsilon_i
-$$
-Use $n = 1024$ for all simulations.
-
-```{r}
-sim_omitted_variables <- function(.data, beta, sigma, formula) {
-  # X gives the number of observations in the data
-  n <- nrow(X)
-  # Draw data
-  # This creates the X matrix
-  X <- model.matrix(~., .data)
-  # Create E(y | X)
-  yhat <- X %*% beta
-  # errors drawn from a normal distribution
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  .data$y <- y
-  # Estimate model
-  mod <- lm(formula, data = .data)
-  # Return results
-  tidy(mod)
-}
-```
-
-```{r, results='hide'}
-n <- 1024
-mu_X <- c(0, 0, 0)
-s_X <- c(1, 1, 1)
-rho <- 0
-R_X <- matrix(c(1, 0, rho,
-                0, 1, 0,
-                rho, 0, 1), byrow = TRUE, nrow = 3)
-X <- as.data.frame(rmvnorm(n, mu_X, sdcor2cov(s_X, R_X)))
-beta <- c(0, 1, 1, 1)
-sigma <- 1.7
-#sim_omitted_variables(X, beta, sigma, x)
-```
-
-## Heteroskedasticity
-
-Consider the case of bivariate regression with a single binary variable, in which each group has a different sample varaince:
-$$
-\begin{aligned}[t]
-y_i &= \beta_0 + \beta_1 x_i + \epsilon_i \\
-x_i &\in \{0, 1\} \\
-\epsilon_i &\sim 
-\begin{cases}
-N(0, 1) & \text{if $x = 0$} \\
-N(0, \sigma^2) & \text{if $x = 1$}
-\end{cases}
-\end{aligned}
-$$
-
-```{r}
-sim_heteroskedasticity <- function(iter, x, beta, sigma) {
-  mu <- cbind(1, x) %*% beta
-  # variance varies by value of x
-  sigma <- ifelse(as.logical(x), sigma, 1)
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  # Estimate model
-  mod <- lm(y ~ x)
-  # Return results
-  tidy(mod)
-}
-```
-
-
-Estimate this with $\beta_0 = 0$, $\beta_1 = 1$, and varying values of sample size and $\sigma$? 
-
-How do the following vary with $\sigma^2$ and $n$?
-
-- bias and variance of `\beta_j`
-- bias of `\se(\beta)_j`
-
-## Non-random sample
-
-This problem considers what happens when there is a truncated dependent variable.
-This is also called sampling on the dependent variable, which is a research design problem not unknown to political science research.[^samplingdv]
-
-The population is a linear normal model with homoskedastic errors.
-$$
-\begin{aligned}[t]
-Y_1 &= \beta_0 + \beta_1 x_{1,i} + \dots + \beta_k x_{k,i} + \epsilon_i \\
-\epsilon_i &\sim N(0, \sigma^2)
-\end{aligned}
-$$
-However, in each sample, all $y_i$ which are less than a quantile $q$ are dropped before the regression is estimated.
-$$
-\begin{aligned}[t]
-y_i = \beta_0 + \hat\beta_1 x_{1,i} + \dots + \hat\beta_k x_{k,i} + \hat\epsilon \\ \text{if $y_i \geq \quantile(y, q)$}
-\end{aligned}
-$$
-where $\quantile(y, q)$ is the $q$th quantile of $y$.
-For example, if $q = 0.5$, all $y_i$ that are less than the median of $y$ (the bottom 50%) are dropped.
-
-The default value `truncation = 0.5` means all values of $y$ less than the median are dropped before running the regression.
-
-Before running simulations, draw a single sample of a linear normal model with homoskedastic errors.
-To do this, you should be able to adapt the code from `sim_lin_normal_truncated`.
-Create a scatter plot with the OLS line for all $y$, and a another plot with only those $y$ less than the median of $y$.
-How does the OLS line estimated on the truncated data differ from the one estimated on the full data.
-
-Run several simulations with `sim_lin_normal_truncated` and vary the sample size.
-How does the sample size affect the following:
-
-- The bias of each $\hat{\beta}_j$?
-- The variance of each $\hat{\beta}_j$?
-
-In particular, if we gather more data but $y$ is truncated, does it decrease the bias in $\hat{\beta}$?
-
-[^randomx]: Although the statistical theory of OLS works (thankfully) for random $X$,
-    as long as certain conditions are met. See Fox (2nd ed.), Ch 9.6.
-
-[^samplingdv]: See Ashworth, Scott, Joshua D. Clinton, Adam Meirowitz, and Kristopher W. Ramsay. 2008. ``Design, Inference, and the Strategic Logic of Suicide Terrorism.'' *American Political Science Review() 102(02): 269–73. <http://journals.cambridge.org/article_S0003055408080167>
-
-```{r}
-sim_truncated <- function(iter, .data, beta, sigma, q) {
-  # X gives the number of observations in the data
-  n <- nrow(X)
-  # Draw data
-  # This creates the X matrix
-  X <- model.matrix(~., .data)
-  # Create E(y | X)
-  yhat <- X %*% beta
-  # errors drawn from a normal distribution
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  .data$y <- y
-  # Remove all observations in which y is above the mean
-  .data <- filter(.data, y > quantile(y, q))
-  # Estimate model
-  mod <- lm(y ~ ., data = .data)
-  # Return results
-  tidy(mod)
-}
-```
-
 
