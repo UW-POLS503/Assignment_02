@@ -4,11 +4,6 @@ output:
   html_document:
     keep_md: true
 ---
-$$
-\DeclareMathOperator{\cor}{cor}
-\DeclareMathOperator{\cov}{cov}
-\DeclareMathOperator{\quantile}{quantile}
-$$
 
 ## Instructions
 
@@ -130,40 +125,21 @@ mean(x_raw)
 sd(x_raw)
 ```
 So, substract the sample mean and divide by the sample standard deviation to get a sample with a mean of 0 and standard deviation of 1,
-$$
+```{r}
 x <- (x_raw - mean(x_raw)) / sd(x_raw)
 mean(x)
 sd(x)
-$$
-Note, the R function `scale` will also do this.
+```
+Note, the R function [scale](http://www.rdocumentation.org/packages/base/functions/scale) will also do this.
 
 We still need to choose a $\sigma^2$.
 This is somewhat arbitrary, but I'll chose a $\sigma$ that gives an $R^2 = 0.7$.
-The function `
+The function ... in `pols503` 
 ```{r}
 sigma <- 0.01
 ```
 
-
-```{r sim_lin_normal_body,eval=FALSE,echo=FALSE}
-  # X gives the number of observations in the data
-  n <- nrow(.data)
-  # Draw data
-  # This creates the X matrix
-  X <- model.matrix(~., .data)
-  print(X)
-  # Create E(y | X)
-  yhat <- X %*% beta
-  # errors drawn from a normal distribution
-  epsilon <- rnorm(n, mean = 0, sd = sigma)
-  # actual y's
-  y <- yhat + epsilon
-  .data$y <- y
-  # Estimate model
-  mod <- lm(y ~ ., data = .data)
-  # Return results
-  tidy(mod)
-```
+Finally, create a data frame with these data in them
 
 
 ```{r}
@@ -234,19 +210,8 @@ X <- as.data.frame(rmvnorm(n, mu_X, sdcor2cov(s_X, R_X)))
 names(X) <- paste("x", seq_len(k), sep = "")
 sigma <- 0.1
 ```
-Run one iteration
-```{r}
-sim_linear_normal(X, beta, sigma)
-```
 
-Run 1024 iterations
-```{r}
-sim1 <- run_iterations(1024, sim_linear_normal, .data = X, beta = beta, sigma = sigma)
-```
-
-Suppose that we want to run this for several different sample sizes
-
-
+<!--
 ## Correlated Variables
 
 In the previous problem, the covariates were assumed to be independent.
@@ -312,7 +277,7 @@ y_i = \hat\beta_0 + \hat\beta_1 x_{1,i} + \hat\beta_2 x_{2,i} + \hat\epsilon_i
 $$
 Use $n = 1024$ for all simulations.
 
-```{r}
+```r
 sim_omitted_variables <- function(.data, beta, sigma, formula) {
   # X gives the number of observations in the data
   n <- nrow(X)
@@ -333,7 +298,7 @@ sim_omitted_variables <- function(.data, beta, sigma, formula) {
 }
 ```
 
-```{r, results='hide'}
+```r, results='hide'
 n <- 1024
 mu_X <- c(0, 0, 0)
 s_X <- c(1, 1, 1)
@@ -362,7 +327,7 @@ N(0, \sigma^2) & \text{if $x = 1$}
 \end{aligned}
 $$
 
-```{r}
+```
 sim_heteroskedasticity <- function(iter, x, beta, sigma) {
   mu <- cbind(1, x) %*% beta
   # variance varies by value of x
@@ -426,7 +391,7 @@ In particular, if we gather more data but $y$ is truncated, does it decrease the
 
 [^samplingdv]: See Ashworth, Scott, Joshua D. Clinton, Adam Meirowitz, and Kristopher W. Ramsay. 2008. ``Design, Inference, and the Strategic Logic of Suicide Terrorism.'' *American Political Science Review() 102(02): 269–73. <http://journals.cambridge.org/article_S0003055408080167>
 
-```{r}
+```
 sim_truncated <- function(iter, .data, beta, sigma, q) {
   # X gives the number of observations in the data
   n <- nrow(X)
@@ -450,3 +415,4 @@ sim_truncated <- function(iter, .data, beta, sigma, q) {
 ```
 
 
+-->
